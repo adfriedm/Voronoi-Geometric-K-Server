@@ -4,32 +4,39 @@ import scipy as sp
 import scipy.spatial
 import sys
 
-from time import time
+import time
 
 eps = sys.float_info.epsilon
 
 
 
-def gen_centers(n=10):
-    gen_pts = zip( np.random.uniform(0.0, 1.0, n), np.random.uniform(0.0, 1.0, n) )
-    return gen_pts
-
 def voronoi(points, bounding_box, tol=100*eps):
-    # Rewrite this, it's idiotically programmed
+    # This part was heavily borrowed from an online post that appears
+    # to have been deleted. This uses reflective properties of the
+    # Voronoi diagrams to place a bounding square. 
+    # This ultimately involves copying the same set of points above,
+    # below and to each side of the bounding box.
+    # In otherwords we are computing the Voronoi on 5 times as many
+    # points as we need to. Not good. Very hacky.
     points_arr = np.array(points)
     points_left = np.copy(points_arr)
-    points_left[:, 0] = bounding_box[0] - (points_left[:, 0] - bounding_box[0])
+    points_left[:, 0] = bounding_box[0] \
+                      - points_left[:, 0] \
+                      - bounding_box[0]
     points_right = np.copy(points_arr)
-    points_right[:, 0] = bounding_box[1] + (bounding_box[1] - points_right[:, 0])
+    points_right[:, 0] = bounding_box[1] \
+                        + bounding_box[1] \
+                        - points_right[:, 0]
     points_down = np.copy(points_arr)
-    points_down[:, 1] = bounding_box[2] - (points_down[:, 1] - bounding_box[2])
+    points_down[:, 1] = bounding_box[2] \
+                      - points_down[:, 1] \
+                      - bounding_box[2]
     points_up = np.copy(points_arr)
-    points_up[:, 1] = bounding_box[3] + (bounding_box[3] - points_up[:, 1])
-    points_arr = np.append(points_arr,
-                       np.append(np.append(points_left, points_right, axis=0),
-                                 np.append(points_down, points_up, axis=0),
-                                 axis=0),
-                       axis=0)
+    points_up[:, 1] = bounding_box[3] \
+                    + bounding_box[3] \
+                    - points_up[:, 1]
+    # Seriously?
+    points_arr = np.append(points_arr, np.append(np.append(points_left, points_right, axis=0), np.append(points_down, points_up, axis=0), axis=0), axis=0)
     # Compute Voronoi
     vor = sp.spatial.Voronoi(points_arr)
     # Filter regions
@@ -71,10 +78,11 @@ def voronoi(points, bounding_box, tol=100*eps):
 def right_triangle_dint(pa, pb, pc):
     beta = np.linalg.norm(pa-pb)
     gamma = np.linalg.norm(pb-pc)
-    return np.sqrt(gamma**2-beta**2)*(2*beta*gamma - (gamma**2-beta**2)*np.log((gamma-beta)/(gamma+beta))) / 12.0
+    return np.sqrt(gamma**2 - beta**2) * (2*beta*gamma - (gamma**2-beta**2)*np.log((gamma-beta)/(gamma+beta))) / 12.0
 
 
-#
+# Compute the distance integral on general triangles using the
+# right-angled triangle function
 def triangle_dint(pa, pb, pc, tol=100*eps):
     ts = np.dot(pc-pa, pb-pa) / np.dot(pb-pa, pb-pa)
     pd = ts*pb + (1-ts)*pa
@@ -103,8 +111,8 @@ def poly_dint(poly, pc, tol=100*eps):
     return tot
 
 
-#
-def expected_dist_conf(points, bounding_box, draw=False):
+# Computes the expected minimum distance for a set of points
+def expected_dist_conf(points, bounding_box=[0., 1., 0., 1.], draw=False):
     vor = voronoi(points, bounding_box)
     
     if draw:
@@ -129,43 +137,40 @@ def expected_dist_conf(points, bounding_box, draw=False):
     # Calculate total distance integral
     for (center,vertices) in vor:
         tot += poly_dint(vertices, center)
-    return tot
+    return tot / ( (bounding_box[1]-bounding_box[0]) \
+                  *(bounding_box[3]-bounding_box[2]))
 
 
 
 
-def main():
+
+def gen_centers(n=10):
+    gen_pts = zip( np.random.uniform(0.0, 1.0, n), np.random.uniform(0.0, 1.0, n) )
+    return gen_pts
+
+
+def test1():
     bounding_box = np.array([0., 1., 0., 1.]) # [x_min, x_max, y_min, y_max]
     points = gen_centers(n=20)
     
-    fig = plt.figure()
-    ax = fig.gca()
+    fig, ax = plt.subplots()
+
     
-    st = time()
+    st = time.clock()
     exp_dist = expected_dist_conf(points, bounding_box, draw=True)
     print exp_dist
-    print "Time elapsed: ", time()-st
-    ax.set_xlim([-0.1, 1.1])
-    ax.set_ylim([-0.1, 1.1])
+    print "Time elapsed: ", time.clock()-st
+
+    ax.set_xlim([0.,1.])
+    ax.set_ylim([0.,1.])
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+
+
+    plt.savefig("figs/voronoi.pdf", bbox_inches='tight')
     plt.show()
 
+
 if __name__ == '__main__':
-    main()
+    test1()
 
-
-
-
-
-
-# # Now find the area
-#    def herons(a, b, c): 
-#        a,b,c = np.sort([a,b,c])
-#        return 0.25*np.sqrt( (a+(b+c))*(c-(a-b))*(c+(a-b))*(a+(b-c)) )
-#    def poly_area(poly, pc):
-#        tot = 0.0
-#        for i in xrange(0,len(poly)):
-#            a = np.linalg.norm(poly[i-1]-poly[i])
-#            b = np.linalg.norm(poly[i]-pc)
-#            c = np.linalg.norm(pc-poly[i-1])
-#            tot += herons(a, b, c)
-#        return tot
