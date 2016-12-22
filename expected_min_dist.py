@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 import scipy.spatial
+import scipy.spatial.distance as dist
+
 import sys
 
 import time
@@ -76,9 +78,14 @@ def voronoi(points, bounding_box, tol=100*eps):
 
 # Right angle on CAB. Distance from C
 def right_triangle_dint(pa, pb, pc):
-    beta = np.linalg.norm(pa-pb)
-    gamma = np.linalg.norm(pb-pc)
-    return np.sqrt(gamma**2 - beta**2) * (2*beta*gamma - (gamma**2-beta**2)*np.log((gamma-beta)/(gamma+beta))) / 12.0
+    a = np.linalg.norm(pb-pc)
+    b = np.linalg.norm(pa-pc)
+    return a*b*np.sqrt(a**2-b**2)/6. \
+            + b**3*np.log((a+np.sqrt(a**2-b**2))/b)/6.
+    #beta = np.linalg.norm(pa-pb)
+    #gamma = np.linalg.norm(pb-pc)
+    #return beta**2 * np.sqrt(gamma**2-beta**2) * (
+    #return np.sqrt(gamma**2 - beta**2) * (2*beta*gamma - (gamma**2-beta**2)*np.log((gamma-beta)/(gamma+beta))) / 12.0
 
 
 # Compute the distance integral on general triangles using the
@@ -151,13 +158,29 @@ def gen_centers(n=10):
 
 def test1():
     bounding_box = np.array([0., 1., 0., 1.]) # [x_min, x_max, y_min, y_max]
-    points = gen_centers(n=20)
+    servers = gen_centers(n=20)
     
+    for _ in xrange(3):
+        # Monte-Carlo to check exp_dist
+        test_points = gen_centers(n=10000)
+        tot = 0.
+        for test_point in test_points:
+            min_dist = float('inf')
+            for server in servers:
+                comp_dist = dist.euclidean(server, test_point)
+                min_dist = comp_dist if (comp_dist < min_dist) \
+                                     else min_dist
+            tot += min_dist
+        print "MC: ", tot/10000.
+
+
+
+
     fig, ax = plt.subplots()
 
     
     st = time.clock()
-    exp_dist = expected_dist_conf(points, bounding_box, draw=True)
+    exp_dist = expected_dist_conf(servers, bounding_box, draw=True)
     print exp_dist
     print "Time elapsed: ", time.clock()-st
 
