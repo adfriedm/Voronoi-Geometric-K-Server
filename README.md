@@ -6,6 +6,6 @@ using a simplicial decomposition of the Voronoi diagram.
 
 We greedily assign servers based on both the distance and the
 resulting expected minimum distance. In theory this should prevent
-many of the usual adversary tricks, that cause unbounded competitive
+many of the usual adversary tricks that cause unbounded competitive
 ratios.
 
